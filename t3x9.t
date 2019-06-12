@@ -130,3 +130,42 @@ numeric(c) return '0' <= c /\ c <= '9';
 
 alphabetic(c) return 'a' <= c /\ c <= 'z' \/
     'A' <= c /\ c <= 'Z';
+
+!!!!! Symbol table
+
+! Symbol table datatype
+struct SYM = SNAME, SFLAGS, SVALUE;
+
+! SFLAGS values
+const GLOBF = 1;                ! global symbol
+const CNST = 2;                 ! constant
+const VECT = 4;                 ! vector or byte vector
+const FORW = 8;                 ! forward declaration
+const FUNC = 16;                ! function
+
+var Syms[SYM*SYMTBL_SIZE];      ! symbol table
+var NList::NLIST_SIZE;          ! name list
+
+var Yp, Np;                     ! offsets of free regions in Syms and NList
+
+! Locate symbol table entry named s, searching from the end to the beginning.
+! Returns the symbol table entry, or 0 if not found.
+find(s) do var i;
+    i := Yp - SYM;
+    while (i >= 0) do
+        if (str.equals(Syms[i+SNAME], s))
+            return @Syms[i];
+        i := i - SYM;
+    end
+    return 0
+end
+
+! Lookup a symbol named s in the symbol table and verify its type against f.
+! Returns the symbol table entry or reports an error and terminates.
+lookup(s, f) do var y;
+    y := find(s);
+    if (y = 0) aw("undefined", s);
+    if (y[SFLAGS] & f \= f)
+        aw("unexpected type", s);
+    return y;
+end
