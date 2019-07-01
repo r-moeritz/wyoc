@@ -169,3 +169,35 @@ lookup(s, f) do var y;
         aw("unexpected type", s);
     return y;
 end
+
+! Add a name to the name list
+! Returns the new name list entry
+newname(s) do var k, new;
+    k := str.length(s)+1;
+    if (Np+k >= NLIST_SIZE
+        aw("too many symbol names", s);
+    new := @NList::Np;
+    t.memcopy(s, new, k);
+    Np := Np+k;
+    return new;
+end
+
+! Add a symbol with flags f and value v to the symbol table
+! Returns the new symbol table entry
+add(s, f, v) do var y;
+    y := find(s);
+    if (y \= 0) do
+        ie (y[SFLAGS] & FORW /\ f & FUNC)
+            return f;
+        else
+            aw("redefined", s);
+    end
+    if (Yp+SYM >= SYMTBL_SIZE*SYM)
+        aw("too many symbols", 0);
+    y := @Syms[Yp];
+    Yp := Yp+SYM;
+    y[SNAME] := newname(s);
+    y[SFLAGS] := f;
+    y[SVALUE] := v;
+    return y;
+end
