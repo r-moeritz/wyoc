@@ -201,3 +201,54 @@ add(s, f, v) do var y;
     y[SVALUE] := v;
     return y;
 end
+
+!!!!! Code Generator
+
+! Load address of the text segment on 386-based systems
+const TEXT_VADDR = 134512640; ! 8048000h
+
+const DATA_VADDR = TEXT_VADDR + TEXT_SIZE;
+
+! Minimal two-segment ELF header
+const HEADER_SIZE = 116; ! 74h
+
+! Size of a virtual memory page in the target OS
+const PAGE_SIZE = 4096;
+
+! A relocation entry consists of an address (RADDR) and a segment (RSEG).
+struct RELOC = RADDR, RSEG;
+
+var Rel[RELOC*NRELOC];
+
+! These byte vectors hold the text and data segment and the ELF header
+var Text_seg::TEXT_SIZE;
+var Data_seg::DATA_SIZE;
+var Header::HEADER_SIZE;
+
+! The following variables indicate:
+! Rp - the free region in the relocation table
+! Tp - the next address in the text segment
+! Dp - the next address in the data segment
+! Lp - the next address in a local stack frame
+! Hp - the free region in the ELF header
+var Rp, Tp, Dp, Lp, Hp;
+
+var Acc;
+var Codetbl;
+struct CG =
+    CG_PUSH, CG_CLEAR,
+    CG_LDVAL, CG_LDADDR, CG_LDLREF, CG_LDGLOB,
+    CG_LDLOCL,
+    CG_STGLOB, CG_STLOCL, CG_STINDR, CG_STINDB,
+    CG_INCGLOB, CG_INCLOCL,
+    CG_ALLOC, CG_DEALLOC, CG_LOCLVEC, CG_GLOBVEC,
+    CG_INDEX, CG_DEREF, CG_INDXB, CG_DREFB,
+    CG_MARK, CG_RESOLV,
+    CG_CALL, CG_JUMPFWD, CG_JUMPBACK, CG_JMPFALSE,
+    CG_JMPTRUE, CG_FOR, CG_FORDOWN,
+    CG_ENTER, CG_EXIT, CG_HALT,
+    CG_NEG, CG_INV, CG_LOGNOT, CG_ADD, CG_SUB,
+    CG_MUL, CG_DIV, CG_MOD, CG_AND, CG_OR, CG_XOR,
+    CG_SHL, CG_SHR, CG_EQ, CG_NEQ, CG_LT, CG_GT,
+    CG_LE, CG_GE,
+    CG_WORD;
