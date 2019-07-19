@@ -252,3 +252,128 @@ struct CG =
     CG_SHL, CG_SHR, CG_EQ, CG_NEQ, CG_LT, CG_GT,
     CG_LE, CG_GE,
     CG_WORD;
+
+! Write the next byte to the text segment
+emit(x) do
+    if (Tp >= TEXT_SIZE)
+        aw("text segement too big", 0);    
+    Text_seg::Tp := x;
+    Tp := Tp+1;
+end
+
+! Emit a machine word in little-endian order to the text segment
+emitw(x) do
+    emit(255&x);
+    emit(255&(x>>8));
+    emit(255&(x>>16));
+    emit(255&(x>>24));
+end
+
+! Tag the current location in the text or data segment for relocation
+tag(seg) do
+    if (Rp+RELOC >= RELOC*NRELOC)
+        oops("relocation buffer overflow", 0);
+    Rel[Rp+RADDR] := seg='t' -> Tp-BPW : Dp-BPW;
+    Rel[Rp+RSEG] := seg;
+    Rp := Rp+RELOC;
+end
+
+! Patch the machine word at text segment location a to contain the value x
+tpatch(a,x) do
+    Text_seg::a := 255&x;
+    Text_seg::(a+1) := 255&(x>>8);
+    Text_seg::(a+2) := 255&(x>>16);
+    Text_seg::(a+3) := 255&(x>>24);
+end
+
+! Fetch the machine word at text segement location a
+tfetch(a) return Text_seg::a
+    | (Text_seg::(a+1)<<8)
+    | (Text_seg::(a+2)<<16)
+    | (Text_seg::(a+3)<<24);
+    
+! Write the next byte to the data segment
+data(x) do
+    if (Dp >= DATA_SIZE)
+        aw("data segment too big", 0)
+    Data_seg::Dp := x;
+    Dp := Dp+1;
+end
+
+! Emit a machine word in little-endian order to the data segment
+dataw(x) do
+    data(255&x);
+    data(255&(x>>8));
+    data(255&(x>>16));
+    data(255&(x>>24));
+end
+
+! Patch the machine word at data segment location a to contain the value x
+dpatch(a,x) do
+    Data_seg::a := 255&x;
+    Data_seg::(a+1) := 255&(x>>8);
+    Data_seg::(a+2) := 255&(x>>16);
+    Data_seg::(a+3) := 255&(x>>24);
+end
+
+! Fetch the machine word at data segement location a
+dfetch(a) return Data_seg::a
+    | (Data_seg::(a+1)<<8)
+    | (Data_seg::(a+2)<<16)
+    | (Data_seg::(a+3)<<24);
+
+! Return the value of the hexadecimal ASCII digit x
+hex(x)
+    ie (numeric(c))
+        return c-'0';
+    else
+        return c-'a'+10;
+
+! Emit program code to the text segment from the augmented hexdump s.
+! v is an optional value that will be inserted into the hexdump when the
+! dump contains an instruction to do so.
+!
+! When rgen() encountes a comma instead of a hex digit, the
+! following character will be interpreted as follows:
+! 
+! w - emit v as a machine word
+! a - emit v as an address (tag for relocation)
+! m - mark the current text address
+! > - create a forward jump
+! < - create a backward jump
+! r - resolve a forward jump
+rgen(s,v) do var x;
+    while (s::0) do
+        ie (s::0 = ',') do
+            ie (s::1 = 'w') do
+                emitw(v);
+            end
+            else ie (s::1 = 'a') do
+                emitw(v);
+                tag('t');
+            end
+            else ie (s::1 = '>') do
+                push(Tp);
+                emitw(0);
+            end
+            else ie (s::1 = '<') do
+                emitw(pop() - Tp - BPW);
+            end
+            else ie (s::1 = 'r') do
+                x := pop();
+                tpatch(x, Tp - x - BPW);
+            end
+            else do
+                oops("bad code", 0);
+            end
+        end
+        else do
+            emit(hex(s::0)*16 + hex(s::1));
+        end
+        s := s+2;
+    end
+end
+
+! Like rgen(), but generates code for the VSM instruction id.
+gen(id,v) rgen(Codetbl[id][1], v);
+
